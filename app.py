@@ -269,11 +269,24 @@ def apply_imported_words(parsed_items: list[dict], mode: str) -> None:
     generate_quiz_question()
 
 
-def render_study_toolbar() -> None:
+def _on_filter_change(widget_key: str) -> None:
+    st.session_state.filter_mode = st.session_state[widget_key]
+    st.session_state.fc_index = 0
+    st.session_state.fc_flipped = False
+    generate_quiz_question()
+
+
+def render_study_toolbar(scope: str = "default") -> None:
     total = len(st.session_state.words)
     mastered_count = sum(1 for w in st.session_state.words if w.get("mastered"))
     review_count = total - mastered_count
     pct = int((mastered_count / total) * 100) if total > 0 else 0
+
+    if st.session_state.filter_mode not in ("all", "review", "mastered"):
+        st.session_state.filter_mode = "all"
+
+    widget_key = f"filter_radio_{scope}"
+    st.session_state[widget_key] = st.session_state.filter_mode
 
     col_prog, col_filter = st.columns([3, 2], vertical_alignment="center")
     with col_prog:
@@ -286,24 +299,19 @@ def render_study_toolbar() -> None:
             "review": f"要復習 ({review_count})",
             "mastered": f"習得済み ({mastered_count})",
         }
-        selected = st.radio(
+        st.radio(
             "フィルター",
             options=["all", "review", "mastered"],
             format_func=lambda k: filter_labels[k],
             horizontal=True,
-            key="filter_radio",
-            index=["all", "review", "mastered"].index(st.session_state.filter_mode),
+            key=widget_key,
+            on_change=_on_filter_change,
+            args=(widget_key,),
         )
-        if selected != st.session_state.filter_mode:
-            st.session_state.filter_mode = selected
-            st.session_state.fc_index = 0
-            st.session_state.fc_flipped = False
-            generate_quiz_question()
-            st.rerun()
 
 
 def render_flashcard_tab() -> None:
-    render_study_toolbar()
+    render_study_toolbar("fc")
     st.divider()
 
     filtered = get_filtered_words()
@@ -396,7 +404,7 @@ def render_flashcard_tab() -> None:
 
 
 def render_quiz_tab() -> None:
-    render_study_toolbar()
+    render_study_toolbar("quiz")
     st.divider()
 
     if len(st.session_state.words) < 4:
